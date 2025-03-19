@@ -27,6 +27,8 @@ const segments = 64;
 const spheres = new THREE.Group();
 const orbitradius = 4.5;
 
+const planetNames = ["Csilla", "Earth", "Venus", "Volcanic"];
+
 const textures = [
   "./csilla/color.png",
   "./earth/map.jpg",
@@ -47,6 +49,7 @@ scene.add(starSphere);
 
 const sphereMesh = [];
 
+// Create planets
 for (let i = 0; i < 4; i++) {
   const textureLoader = new THREE.TextureLoader();
   const texture = textureLoader.load(textures[i]);
@@ -75,47 +78,11 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Handle wheel (mouse scroll) on desktop
-let lastWheelTime = 0;
-const throttleDelay = 2000;
-let scrollCount = 0;
-
-function throttleWheelHandler(event) {
-  const currentTime = Date.now();
-  if (currentTime - lastWheelTime >= throttleDelay) {
-    lastWheelTime = currentTime;
-    scrollCount = (scrollCount + 1) % 4;
-    console.log(scrollCount);
-    const headings = document.querySelectorAll('.heading');
-    gsap.to(headings, {
-      duration: 1,
-      y: `-=${100}%`,
-      ease: 'power2.inOut'
-    });
-    gsap.to(spheres.rotation, {
-      duration: 1,
-      y: `-=${Math.PI / 2}%`,
-      ease: `power2.inOut `
-    });
-    if (scrollCount == 0) {
-      gsap.to(headings, {
-        duration: 1,
-        y: `0`,
-        ease: 'power2.inOut'
-      });
-    }
-  }
-}
-
-// Wheel scroll event listener for desktop
-window.addEventListener('wheel', throttleWheelHandler);
-
-// Touch event variables
+// Handle touch events for mobile
 let touchStartX = 0;
 let touchStartY = 0;
 let touchEndX = 0;
 let touchEndY = 0;
-let pinchDistance = null;
 
 const isTouchDevice = 'ontouchstart' in window;
 
@@ -123,16 +90,10 @@ function preventDefault(event) {
   event.preventDefault(); // Prevent scrolling and other default behaviors during touch interaction
 }
 
-// Handle touch events for mobile
+// Handle touchstart and touchmove events
 canvas.addEventListener('touchstart', (event) => {
   touchStartX = event.touches[0].clientX;
   touchStartY = event.touches[0].clientY;
-  if (event.touches.length === 2) {
-    pinchDistance = Math.hypot(
-      event.touches[0].clientX - event.touches[1].clientX,
-      event.touches[0].clientY - event.touches[1].clientY
-    );
-  }
   preventDefault(event); // Prevent default scroll behavior
 });
 
@@ -143,34 +104,59 @@ canvas.addEventListener('touchmove', (event) => {
   const deltaX = touchEndX - touchStartX;
   const deltaY = touchEndY - touchStartY;
 
+  // Rotate planets based on touch movement
   if (Math.abs(deltaX) > 10) {
     spheres.rotation.y += deltaX * 0.005; // Adjust multiplier for smoother rotation
-    touchStartX = touchEndX;
+    touchStartX = touchEndX; // Update start position for next move
   }
 
   if (Math.abs(deltaY) > 10) {
     spheres.rotation.x += deltaY * 0.005; // Adjust multiplier for smoother rotation
-    touchStartY = touchEndY;
+    touchStartY = touchEndY; // Update start position for next move
   }
 
-  // Handle pinch-to-zoom
-  if (event.touches.length === 2 && pinchDistance !== null) {
-    let newPinchDistance = Math.hypot(
-      event.touches[0].clientX - event.touches[1].clientX,
-      event.touches[0].clientY - event.touches[1].clientY
-    );
-    const zoomFactor = newPinchDistance / pinchDistance;
-    camera.position.z *= zoomFactor;
-    pinchDistance = newPinchDistance;
-  }
+  // Check if a planet is touched based on position
+  checkPlanetTouch(event);
 
   preventDefault(event); // Prevent default scroll behavior
 });
 
-canvas.addEventListener('touchend', (event) => {
-  pinchDistance = null; // Reset pinch distance
-  preventDefault(event); // Prevent default scroll behavior
+canvas.addEventListener('touchend', () => {
+  // You could reset any variables or do something when touch ends
 });
+
+// Check if a planet is touched and update the heading
+function checkPlanetTouch(event) {
+  const touchX = event.touches[0].clientX;
+  const touchY = event.touches[0].clientY;
+  
+  // Determine the planet touched by its position on the screen
+  const rect = canvas.getBoundingClientRect();
+  const canvasWidth = rect.width;
+  const canvasHeight = rect.height;
+
+  const mouseX = (touchX / canvasWidth) * 2 - 1; // Normalized device coordinates
+  const mouseY = -(touchY / canvasHeight) * 2 + 1; // Normalized device coordinates
+
+  // Create a raycaster to detect the intersection with the planets
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2(mouseX, mouseY);
+  raycaster.updateMatrixWorld(); // Update world matrix
+  raycaster.setFromCamera(mouse, camera); // Set raycaster from camera
+
+  // Check for intersections with the planets
+  const intersects = raycaster.intersectObject(spheres, true);
+
+  if (intersects.length > 0) {
+    const intersectedObject = intersects[0].object;
+    const planetIndex = sphereMesh.indexOf(intersectedObject);
+
+    // Update the planet name in the heading
+    if (planetIndex >= 0) {
+      document.querySelector('h1').textContent = planetNames[planetIndex];
+    }
+  }
+}
 
 // Animation loop
 const clock = new THREE.Clock();
