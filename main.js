@@ -1,5 +1,4 @@
 import './style.css';
-
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader';
@@ -76,6 +75,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// Handle wheel (mouse scroll) on desktop
 let lastWheelTime = 0;
 const throttleDelay = 2000;
 let scrollCount = 0;
@@ -84,11 +84,6 @@ function throttleWheelHandler(event) {
   const currentTime = Date.now();
   if (currentTime - lastWheelTime >= throttleDelay) {
     lastWheelTime = currentTime;
-    if (event.deltaY < 0) {
-      // console.log("Up");
-    } else {
-      // console.log("Down");
-    }
     scrollCount = (scrollCount + 1) % 4;
     console.log(scrollCount);
     const headings = document.querySelectorAll('.heading');
@@ -112,6 +107,7 @@ function throttleWheelHandler(event) {
   }
 }
 
+// Wheel scroll event listener for desktop
 window.addEventListener('wheel', throttleWheelHandler);
 
 // Touch event variables
@@ -119,10 +115,25 @@ let touchStartX = 0;
 let touchStartY = 0;
 let touchEndX = 0;
 let touchEndY = 0;
+let pinchDistance = null;
 
+const isTouchDevice = 'ontouchstart' in window;
+
+function preventDefault(event) {
+  event.preventDefault(); // Prevent scrolling and other default behaviors during touch interaction
+}
+
+// Handle touch events for mobile
 canvas.addEventListener('touchstart', (event) => {
   touchStartX = event.touches[0].clientX;
   touchStartY = event.touches[0].clientY;
+  if (event.touches.length === 2) {
+    pinchDistance = Math.hypot(
+      event.touches[0].clientX - event.touches[1].clientX,
+      event.touches[0].clientY - event.touches[1].clientY
+    );
+  }
+  preventDefault(event); // Prevent default scroll behavior
 });
 
 canvas.addEventListener('touchmove', (event) => {
@@ -133,29 +144,46 @@ canvas.addEventListener('touchmove', (event) => {
   const deltaY = touchEndY - touchStartY;
 
   if (Math.abs(deltaX) > 10) {
-    spheres.rotation.y += deltaX * 0.005; // Adjust the multiplier for smoother rotation
+    spheres.rotation.y += deltaX * 0.005; // Adjust multiplier for smoother rotation
     touchStartX = touchEndX;
   }
 
   if (Math.abs(deltaY) > 10) {
-    spheres.rotation.x += deltaY * 0.005; // Adjust the multiplier for smoother rotation
+    spheres.rotation.x += deltaY * 0.005; // Adjust multiplier for smoother rotation
     touchStartY = touchEndY;
   }
+
+  // Handle pinch-to-zoom
+  if (event.touches.length === 2 && pinchDistance !== null) {
+    let newPinchDistance = Math.hypot(
+      event.touches[0].clientX - event.touches[1].clientX,
+      event.touches[0].clientY - event.touches[1].clientY
+    );
+    const zoomFactor = newPinchDistance / pinchDistance;
+    camera.position.z *= zoomFactor;
+    pinchDistance = newPinchDistance;
+  }
+
+  preventDefault(event); // Prevent default scroll behavior
 });
 
 canvas.addEventListener('touchend', (event) => {
-  // Optionally, reset the rotation or implement a logic on touch end
+  pinchDistance = null; // Reset pinch distance
+  preventDefault(event); // Prevent default scroll behavior
 });
 
 // Animation loop
 const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
+
+  // Rotate spheres continuously
   for (let i = 0; i < sphereMesh.length; i++) {
     const sphere = sphereMesh[i];
     sphere.rotation.y = clock.getElapsedTime() * 0.02;
   }
-  // Render
+
+  // Render scene
   renderer.render(scene, camera);
 }
 
